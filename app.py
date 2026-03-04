@@ -80,4 +80,8 @@ if st.button("Gerar Jogo"):
     jogo = sorted(np.random.choice(range(1, total_numeros + 1),
                                    dezenas,
                                    replace=False))
-    st.success(jogo)
+    
+    jogo_formatado = [int(n) for n in jogo]
+    
+    st.success(" | ".join(f"{n:02d}" for n in jogo_formatado))
+
