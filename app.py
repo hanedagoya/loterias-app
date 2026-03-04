@@ -9,7 +9,7 @@ st.set_page_config(page_title="Loterias - Análise Estatística", layout="wide")
 st.title("📊 Análise Estatística - Mega-Sena & Lotofácil")
 
 # ===============================
-# Configuração da Loteria
+# Escolha da Loteria
 # ===============================
 
 loteria = st.sidebar.selectbox(
@@ -20,28 +20,27 @@ loteria = st.sidebar.selectbox(
 if loteria == "Mega-Sena":
     total_numeros = 60
     dezenas = 6
-    concursos = 3000
 else:
     total_numeros = 25
     dezenas = 15
-    concursos = 3000
+
+concursos = 3000
 
 # ===============================
-# Simulação histórica
+# Simulação (corrigida)
 # ===============================
 
 @st.cache_data
-def simular():
+def simular(total_numeros, dezenas, concursos):
     jogos = [
-        np.random.choice(range(1,total_numeros+1),
+        np.random.choice(range(1, total_numeros + 1),
                          dezenas,
                          replace=False)
         for _ in range(concursos)
     ]
-    df = pd.DataFrame(jogos)
-    return df
+    return pd.DataFrame(jogos)
 
-df = simular()
+df = simular(total_numeros, dezenas, concursos)
 
 # ===============================
 # Estatísticas
@@ -51,15 +50,15 @@ valores = df.values.flatten()
 freq = pd.Series(valores).value_counts().sort_index()
 
 soma = df.sum(axis=1)
-pares = df.apply(lambda x: sum(n%2==0 for n in x), axis=1)
+pares = df.apply(lambda x: sum(n % 2 == 0 for n in x), axis=1)
 
 stat, p = chisquare(freq, [freq.sum()/total_numeros]*total_numeros)
 
 col1, col2, col3 = st.columns(3)
 
-col1.metric("Média da Soma", round(soma.mean(),2))
-col2.metric("Média de Pares", round(pares.mean(),2))
-col3.metric("p-value Qui²", round(p,4))
+col1.metric("Média da Soma", round(soma.mean(), 2))
+col2.metric("Média de Pares", round(pares.mean(), 2))
+col3.metric("p-value Qui²", round(p, 4))
 
 # ===============================
 # Gráfico
@@ -78,7 +77,7 @@ st.pyplot(fig)
 st.subheader("🎲 Gerar Jogo Aleatório")
 
 if st.button("Gerar Jogo"):
-    jogo = sorted(np.random.choice(range(1,total_numeros+1),
+    jogo = sorted(np.random.choice(range(1, total_numeros + 1),
                                    dezenas,
                                    replace=False))
     st.success(jogo)
