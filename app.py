@@ -2,110 +2,240 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import chisquare
+from itertools import combinations
+from collections import Counter
 
-st.set_page_config(page_title="Análise Loterias", layout="wide")
+st.set_page_config(page_title="Análise de Loterias", layout="wide")
 
-st.title("📊 Análise Estatística - Mega-Sena & Lotofácil")
+st.title("📊 Ferramenta Estatística de Análise de Loterias")
 
-# ------------------------------
-# Escolha da loteria
-# ------------------------------
+st.sidebar.title("Configurações")
 
-loteria = st.sidebar.selectbox(
-    "Escolha a loteria",
-    ["Mega-Sena", "Lotofácil"]
-)
-
-if loteria == "Mega-Sena":
-    total_numeros = 60
-    dezenas = 6
-else:
-    total_numeros = 25
-    dezenas = 15
-
-# ------------------------------
-# Upload do arquivo
-# ------------------------------
-
-st.subheader("📂 Upload do arquivo oficial (.xlsx)")
-
-arquivo = st.file_uploader(
-    "Envie o arquivo baixado do site da Caixa",
+uploaded_file = st.sidebar.file_uploader(
+    "Upload arquivo oficial da Caixa (.xlsx)",
     type=["xlsx"]
 )
 
-if arquivo is not None:
+if uploaded_file:
 
-    df_raw = pd.read_excel(arquivo)
-
-    # pegar apenas colunas numéricas
-    colunas_numericas = df_raw.select_dtypes(include=np.number)
-
-    # pegar últimas colunas (onde ficam as dezenas)
-    df = colunas_numericas.iloc[:, -dezenas:]
+    df_raw = pd.read_excel(uploaded_file)
 
     st.success("Arquivo carregado com sucesso!")
 
-    # ------------------------------
-    # Estatísticas
-    # ------------------------------
+    # detectar colunas de números
+    cols_numeros = [c for c in df_raw.columns if "Bola" in c or "bola" in c or "Dezena" in c]
 
-    valores = df.values.flatten()
+    if len(cols_numeros) == 0:
+        cols_numeros = df_raw.columns[-15:]
 
-    freq = pd.Series(valores).value_counts().sort_index()
-    freq = freq.reindex(range(1, total_numeros + 1), fill_value=0)
+    df = df_raw[cols_numeros].copy()
 
-    soma = df.sum(axis=1)
+    df = df.astype(int)
 
-    pares = df.apply(lambda x: sum(n % 2 == 0 for n in x), axis=1)
+    total_concursos = len(df)
 
-    stat, p = chisquare(freq, [freq.sum() / total_numeros] * total_numeros)
+    st.sidebar.write("Concursos carregados:", total_concursos)
 
-    col1, col2, col3 = st.columns(3)
+    numeros = list(range(1, 26))
 
-    col1.metric("Média da soma", round(soma.mean(), 2))
-    col2.metric("Média de pares", round(pares.mean(), 2))
-    col3.metric("p-value Qui²", round(p, 4))
+    menu = st.sidebar.selectbox(
+        "Menu",
+        [
+            "Visão geral",
+            "Frequência dos números",
+            "Números atrasados",
+            "Par / Ímpar",
+            "Soma dos jogos",
+            "Repetição entre concursos",
+            "Combinações mais comuns",
+            "Gerador inteligente"
+        ]
+    )
 
-    # ------------------------------
-    # Gráfico frequência
-    # ------------------------------
+    if menu == "Visão geral":
 
-    st.subheader("Frequência dos números")
+        st.header("Resumo do histórico")
 
-    fig, ax = plt.subplots()
-    ax.bar(freq.index, freq.values)
+        st.write("Total de concursos analisados:", total_concursos)
 
-    st.pyplot(fig)
+        st.dataframe(df.tail())
 
-    # ------------------------------
-    # Top números
-    # ------------------------------
+    if menu == "Frequência dos números":
 
-    st.subheader("🔥 Top 10 mais frequentes")
+        st.header("Frequência dos números")
 
-    st.write(freq.sort_values(ascending=False).head(10))
+        freq = df.apply(pd.Series.value_counts).fillna(0).sum(axis=1)
 
-    # ------------------------------
-    # Gerador de jogo
-    # ------------------------------
+        freq = freq.sort_index()
 
-    st.subheader("🎲 Gerar jogo baseado na frequência")
+        fig, ax = plt.subplots()
 
-    if st.button("Gerar jogo"):
+        ax.bar(freq.index, freq.values)
 
-        probabilidades = freq / freq.sum()
+        ax.set_xlabel("Número")
+        ax.set_ylabel("Frequência")
 
-        jogo = np.random.choice(
-            freq.index,
-            size=dezenas,
-            replace=False,
-            p=probabilidades
+        st.pyplot(fig)
+
+        st.subheader("Ranking")
+
+        ranking = freq.sort_values(ascending=False)
+
+        st.dataframe(ranking)
+
+    if menu == "Números atrasados":
+
+        st.header("Atraso dos números")
+
+        atrasos = {}
+
+        for n in numeros:
+
+            linhas = df[df.eq(n).any(axis=1)].index
+
+            if len(linhas) == 0:
+
+                atrasos[n] = total_concursos
+
+            else:
+
+                atrasos[n] = total_concursos - linhas.max()
+
+        atrasos = pd.Series(atrasos)
+
+        fig, ax = plt.subplots()
+
+        ax.bar(atrasos.index, atrasos.values)
+
+        ax.set_xlabel("Número")
+        ax.set_ylabel("Concursos de atraso")
+
+        st.pyplot(fig)
+
+        st.dataframe(atrasos.sort_values(ascending=False))
+
+    if menu == "Par / Ímpar":
+
+        st.header("Distribuição Par / Ímpar")
+
+        pares = df.apply(lambda x: sum(n % 2 == 0 for n in x), axis=1)
+
+        impares = 15 - pares
+
+        dist = pares.value_counts().sort_index()
+
+        fig, ax = plt.subplots()
+
+        ax.bar(dist.index, dist.values)
+
+        ax.set_xlabel("Quantidade de pares no jogo")
+        ax.set_ylabel("Ocorrências")
+
+        st.pyplot(fig)
+
+        tabela = pd.DataFrame({
+            "pares": pares,
+            "ímpares": impares
+        })
+
+        st.dataframe(tabela)
+
+    if menu == "Soma dos jogos":
+
+        st.header("Distribuição da soma")
+
+        soma = df.sum(axis=1)
+
+        fig, ax = plt.subplots()
+
+        ax.hist(soma, bins=20)
+
+        ax.set_xlabel("Soma dos números")
+
+        st.pyplot(fig)
+
+        st.write("Soma média:", soma.mean())
+
+    if menu == "Repetição entre concursos":
+
+        st.header("Repetição de números entre concursos")
+
+        repeticoes = []
+
+        for i in range(1, total_concursos):
+
+            atual = set(df.iloc[i])
+
+            anterior = set(df.iloc[i-1])
+
+            repeticoes.append(len(atual & anterior))
+
+        repeticoes = pd.Series(repeticoes)
+
+        fig, ax = plt.subplots()
+
+        ax.hist(repeticoes, bins=10)
+
+        ax.set_xlabel("Quantidade de números repetidos")
+
+        st.pyplot(fig)
+
+        st.write("Média de repetição:", repeticoes.mean())
+
+    if menu == "Combinações mais comuns":
+
+        st.header("Pares mais frequentes")
+
+        pares = Counter()
+
+        for row in df.values:
+
+            for c in combinations(row, 2):
+
+                pares[c] += 1
+
+        mais_comuns = pares.most_common(20)
+
+        tabela = pd.DataFrame(mais_comuns, columns=["Par", "Frequência"])
+
+        st.dataframe(tabela)
+
+    if menu == "Gerador inteligente":
+
+        st.header("Gerador inteligente de jogos")
+
+        qtd = st.number_input(
+            "Quantidade de jogos",
+            min_value=1,
+            max_value=50,
+            value=5
         )
 
-        jogo = sorted([int(n) for n in jogo])
+        freq = df.apply(pd.Series.value_counts).fillna(0).sum(axis=1)
 
-        jogo_formatado = " | ".join(f"{n:02d}" for n in jogo)
+        prob = freq / freq.sum()
 
-        st.success(jogo_formatado)
+        jogos = []
+
+        for i in range(qtd):
+
+            jogo = np.random.choice(
+                prob.index,
+                size=15,
+                replace=False,
+                p=prob.values
+            )
+
+            jogo = sorted(jogo)
+
+            jogos.append(jogo)
+
+        st.subheader("Jogos gerados")
+
+        for j in jogos:
+
+            st.success(" | ".join(f"{n:02d}" for n in j))
+
+else:
+
+    st.info("Faça upload do arquivo histórico da Caixa para iniciar.")
