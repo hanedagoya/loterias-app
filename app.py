@@ -49,7 +49,15 @@ if arquivo is not None:
     # ==============================
 
     valores = df.values.flatten()
-    freq = pd.Series(valores).value_counts().sort_index()
+    valores = df.values.flatten()
+
+freq = pd.Series(valores).value_counts().sort_index()
+freq = freq.reindex(range(1, total_numeros + 1), fill_value=0)
+
+soma = df.sum(axis=1)
+pares = df.apply(lambda x: sum(n % 2 == 0 for n in x), axis=1)
+
+stat, p = chisquare(freq, [freq.sum()/total_numeros]*total_numeros)
 
     soma = df.sum(axis=1)
     pares = df.apply(lambda x: sum(n % 2 == 0 for n in x), axis=1)
@@ -96,3 +104,4 @@ if arquivo is not None:
 
         jogo = sorted([int(n) for n in jogo])
         st.success(" | ".join(f"{n:02d}" for n in jogo))
+
