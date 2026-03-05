@@ -8,23 +8,23 @@ st.set_page_config(page_title="Análise de Loterias", layout="wide")
 
 st.title("📊 Análise Estatística de Loterias")
 
-st.write("Upload do arquivo oficial da Caixa (.xlsx)")
+st.write("Faça upload do arquivo oficial da Caixa (.xlsx)")
 
 uploaded_file = st.file_uploader("Arquivo", type=["xlsx"])
 
 if uploaded_file is None:
+st.warning("Envie um arquivo para continuar.")
 st.stop()
 
 try:
 df = pd.read_excel(uploaded_file)
-except:
-st.error("Erro ao ler o arquivo.")
+except Exception:
+st.error("Erro ao ler o arquivo Excel.")
 st.stop()
 
-# detectar colunas de dezenas automaticamente
+# Detectar colunas com dezenas automaticamente
 
 cols = []
-
 for c in df.columns:
 name = str(c).lower()
 if "bola" in name or "dezena" in name:
@@ -35,57 +35,47 @@ st.error("Não foi possível identificar as colunas de dezenas.")
 st.stop()
 
 df = df[cols]
-
 df = df.apply(pd.to_numeric, errors="coerce")
-
 df = df.dropna()
 
 numeros = df.values.flatten().astype(int)
 
-st.subheader("Quantidade de sorteios")
+st.subheader("Quantidade de concursos analisados")
 st.write(len(df))
 
-# frequência
+# Frequência das dezenas
 
 freq = Counter(numeros)
 
-max_num = max(numeros)
-
-freq_list = [freq.get(i,0) for i in range(1,max_num+1)]
+max_num = int(max(numeros))
 
 freq_df = pd.DataFrame({
-"numero": range(1,max_num+1),
-"frequencia": freq_list
+"numero": list(range(1, max_num + 1)),
+"frequencia": [freq.get(i, 0) for i in range(1, max_num + 1)]
 })
 
-st.subheader("Frequência dos números")
+st.subheader("Frequência das dezenas")
 
 fig = px.bar(freq_df, x="numero", y="frequencia")
 
 st.plotly_chart(fig, use_container_width=True)
 
-# números mais frequentes
+# Top números
 
 top = freq_df.sort_values("frequencia", ascending=False).head(10)
 
-st.subheader("Top 10 números")
+st.subheader("Top 10 dezenas mais frequentes")
 
 st.dataframe(top)
 
-# gerador simples
+# Gerador de jogo
 
 st.subheader("Gerador de jogo aleatório")
 
-qtd = st.slider("Quantidade de números", 6, 15, 6)
+qtd = st.slider("Quantidade de dezenas", 6, 15, 6)
 
 if st.button("Gerar jogo"):
-
-```
-nums = list(range(1, max_num+1))
-
+nums = list(range(1, max_num + 1))
 jogo = np.random.choice(nums, qtd, replace=False)
-
 jogo = sorted(jogo)
-
 st.success(" | ".join(f"{n:02d}" for n in jogo))
-```
