@@ -2,199 +2,279 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import itertools
-from collections import Counter
-from sklearn.ensemble import RandomForestClassifier
-from scipy.stats import entropy
 import random
+from collections import Counter
+from scipy.stats import entropy
+from sklearn.ensemble import RandomForestClassifier
 
-st.set_page_config(page_title="Análise Científica de Loterias", layout="wide")
+st.set_page_config(page_title="Laboratório Científico de Loterias", layout="wide")
 
-st.title("🔬 Plataforma Científica de Análise de Loterias")
+st.title("🧠 Laboratório Científico de Análise de Loterias")
 
-uploaded_file = st.file_uploader(
-    "Envie o arquivo oficial da Caixa (.xlsx)",
-    type=["xlsx"]
-)
+st.markdown("""
+Ferramenta experimental baseada em:
+
+• Estatística clássica
+• Teoria da informação
+• Machine Learning
+• Simulação Monte Carlo
+• Algoritmos evolutivos
+""")
+
+uploaded_file = st.file_uploader("Envie o arquivo oficial da Caixa (.xlsx)", type=["xlsx"])
 
 if uploaded_file is None:
-    st.info("Envie o arquivo para iniciar.")
-    st.stop()
+st.stop()
 
 df = pd.read_excel(uploaded_file)
 
 # detectar colunas de números
-colunas = [c for c in df.columns if "bola" in c.lower() or "dezena" in c.lower()]
-df = df[colunas]
+
+cols = [c for c in df.columns if "bola" in c.lower() or "dezena" in c.lower()]
+df = df[cols]
 
 numeros = df.values.flatten()
 
 max_num = int(np.max(numeros))
 
-st.sidebar.header("Configurações")
+st.sidebar.header("Configuração")
 
-tipo = st.sidebar.selectbox(
-    "Tipo de jogo",
-    ["Mega-Sena", "Lotofácil"]
-)
+tipo = st.sidebar.selectbox("Tipo de jogo", ["Mega-Sena", "Lotofácil"])
 
 if tipo == "Mega-Sena":
-    numeros_totais = 60
-    numeros_jogo = 6
+total = 60
+jogo_n = 6
 else:
-    numeros_totais = 25
-    numeros_jogo = 15
+total = 25
+jogo_n = 15
 
-# ----------------------------
+# ---------------------------------
+
 # Frequência
-# ----------------------------
+
+# ---------------------------------
+
+st.header("📊 Frequência Histórica")
 
 freq = Counter(numeros)
 
 freq_df = pd.DataFrame({
-    "numero": list(range(1, numeros_totais + 1)),
-    "frequencia": [freq.get(i,0) for i in range(1,numeros_totais+1)]
+"numero": list(range(1,total+1)),
+"freq":[freq.get(i,0) for i in range(1,total+1)]
 })
 
-st.subheader("Frequência histórica")
+fig = px.bar(freq_df,x="numero",y="freq")
+st.plotly_chart(fig,use_container_width=True)
 
-fig = px.bar(freq_df, x="numero", y="frequencia")
-st.plotly_chart(fig, use_container_width=True)
+# ---------------------------------
 
-# ----------------------------
 # Entropia
-# ----------------------------
 
-prob = freq_df["frequencia"] / freq_df["frequencia"].sum()
+# ---------------------------------
+
+st.header("🧮 Entropia do sistema")
+
+prob = freq_df["freq"]/freq_df["freq"].sum()
 ent = entropy(prob)
 
-st.subheader("Entropia de Shannon")
+st.write("Entropia de Shannon:",round(ent,4))
 
-st.write(f"Entropia do sistema: **{ent:.4f}**")
+# ---------------------------------
 
-# ----------------------------
-# Correlação
-# ----------------------------
+# Atraso de números
 
-st.subheader("Correlação entre posições")
+# ---------------------------------
 
-corr = df.corr()
+st.header("⏳ Atraso das dezenas")
 
-fig = px.imshow(corr, text_auto=True)
-st.plotly_chart(fig, use_container_width=True)
+delay = {}
 
-# ----------------------------
-# Modelo de Machine Learning
-# ----------------------------
+for n in range(1,total+1):
+for i in range(len(df)-1,-1,-1):
+if n in df.iloc[i].values:
+delay[n]=len(df)-i
+break
 
-st.subheader("Modelo preditivo (Random Forest)")
-
-X = []
-y = []
-
-for i in range(len(df)-1):
-
-    atual = df.iloc[i].values
-    prox = df.iloc[i+1].values
-
-    for n in range(1, numeros_totais+1):
-
-        X.append([n in atual])
-        y.append(int(n in prox))
-
-X = np.array(X)
-y = np.array(y)
-
-model = RandomForestClassifier(n_estimators=200)
-model.fit(X, y)
-
-probabilidades = []
-
-for n in range(1, numeros_totais+1):
-
-    p = model.predict_proba([[False]])[0][1]
-    probabilidades.append(p)
-
-prob_df = pd.DataFrame({
-    "numero": range(1,numeros_totais+1),
-    "probabilidade": probabilidades
+delay_df = pd.DataFrame({
+"numero":list(delay.keys()),
+"atraso":list(delay.values())
 })
 
-fig = px.bar(prob_df, x="numero", y="probabilidade")
-st.plotly_chart(fig, use_container_width=True)
+fig = px.bar(delay_df,x="numero",y="atraso")
+st.plotly_chart(fig,use_container_width=True)
 
-# ----------------------------
-# Simulação Monte Carlo
-# ----------------------------
+# ---------------------------------
 
-st.subheader("Simulação Monte Carlo")
+# Co-ocorrência
 
-simulacoes = st.slider("Número de simulações", 1000, 100000, 10000)
+# ---------------------------------
 
-resultados = []
+st.header("🔥 Co-ocorrência entre números")
 
-numeros_lista = list(range(1,numeros_totais+1))
+matrix = np.zeros((total,total))
 
-for _ in range(simulacoes):
+for row in df.values:
+for a in row:
+for b in row:
+if a!=b:
+matrix[a-1][b-1]+=1
 
-    jogo = random.sample(numeros_lista, numeros_jogo)
+fig = px.imshow(matrix)
+st.plotly_chart(fig,use_container_width=True)
 
-    score = sum(freq[n] for n in jogo)
+# ---------------------------------
 
-    resultados.append((jogo,score))
+# Machine Learning
 
-resultados.sort(key=lambda x: x[1], reverse=True)
+# ---------------------------------
 
-top = resultados[:20]
+st.header("🤖 Probabilidade com Random Forest")
 
-st.write("Top jogos simulados")
-
-for jogo,score in top:
-
-    st.write(jogo)
-
-# ----------------------------
-# Gerador otimizado
-# ----------------------------
-
-st.subheader("Gerador Inteligente de Jogos")
-
-qtde = st.slider("Quantidade de jogos", 1, 20, 5)
-
-melhores = prob_df.sort_values("probabilidade", ascending=False)
-
-pool = list(melhores["numero"].head(30))
-
-jogos = []
-
-for _ in range(qtde):
-
-    jogo = sorted(random.sample(pool, numeros_jogo))
-    jogos.append(jogo)
-
-for j in jogos:
-
-    st.success(" | ".join(f"{n:02d}" for n in j))
-
-# ----------------------------
-# Backtesting
-# ----------------------------
-
-st.subheader("Backtesting")
-
-acertos = []
+X=[]
+y=[]
 
 for i in range(len(df)-1):
 
-    sorteio = set(df.iloc[i+1].values)
+```
+atual=df.iloc[i].values
+prox=df.iloc[i+1].values
 
-    jogo = set(random.sample(pool, numeros_jogo))
+for n in range(1,total+1):
 
-    acertos.append(len(sorteio & jogo))
+    X.append([n in atual])
+    y.append(int(n in prox))
+```
 
-media = np.mean(acertos)
+X=np.array(X)
+y=np.array(y)
 
-st.write(f"Média de acertos simulada: **{media:.2f}**")
+model=RandomForestClassifier(n_estimators=200)
+model.fit(X,y)
 
-fig = px.histogram(acertos)
-st.plotly_chart(fig, use_container_width=True)
+probs=[]
+
+for n in range(1,total+1):
+p=model.predict_proba([[False]])[0][1]
+probs.append(p)
+
+prob_df=pd.DataFrame({
+"numero":range(1,total+1),
+"prob":probs
+})
+
+fig=px.bar(prob_df,x="numero",y="prob")
+st.plotly_chart(fig,use_container_width=True)
+
+# ---------------------------------
+
+# Monte Carlo
+
+# ---------------------------------
+
+st.header("🎲 Simulação Monte Carlo")
+
+sim=st.slider("Simulações",1000,200000,20000)
+
+nums=list(range(1,total+1))
+
+result=[]
+
+for _ in range(sim):
+
+```
+jogo=random.sample(nums,jogo_n)
+
+score=sum(freq[n] for n in jogo)
+
+result.append((jogo,score))
+```
+
+result.sort(key=lambda x:x,reverse=True)
+
+top=result[:20]
+
+st.subheader("Melhores jogos simulados")
+
+for j,s in top:
+st.write(j)
+
+# ---------------------------------
+
+# Algoritmo Genético
+
+# ---------------------------------
+
+st.header("🧬 Gerador Evolutivo de Jogos")
+
+def fitness(jogo):
+
+```
+f=sum(freq[n] for n in jogo)
+d=sum(delay[n] for n in jogo)
+
+return f*0.7 + d*0.3
+```
+
+pop=50
+
+population=[random.sample(nums,jogo_n) for _ in range(pop)]
+
+for _ in range(100):
+
+```
+population=sorted(population,key=fitness,reverse=True)
+
+new_pop=population[:10]
+
+while len(new_pop)<pop:
+
+    p1=random.choice(population[:20])
+    p2=random.choice(population[:20])
+
+    cut=random.randint(1,jogo_n-1)
+
+    child=list(set(p1[:cut]+p2[cut:]))
+
+    while len(child)<jogo_n:
+        n=random.choice(nums)
+        if n not in child:
+            child.append(n)
+
+    new_pop.append(child)
+
+population=new_pop
+```
+
+best=sorted(population,key=fitness,reverse=True)[:10]
+
+st.subheader("Top jogos evolutivos")
+
+for j in best:
+st.success(" | ".join(f"{n:02d}" for n in sorted(j)))
+
+# ---------------------------------
+
+# Backtesting
+
+# ---------------------------------
+
+st.header("🧪 Backtesting")
+
+hits=[]
+
+pool=list(prob_df.sort_values("prob",ascending=False)["numero"][:30])
+
+for i in range(len(df)-1):
+
+```
+real=set(df.iloc[i+1].values)
+
+jogo=set(random.sample(pool,jogo_n))
+
+hits.append(len(real & jogo))
+```
+
+st.write("Média de acertos:",round(np.mean(hits),2))
+
+fig=px.histogram(hits)
+st.plotly_chart(fig,use_container_width=True)
