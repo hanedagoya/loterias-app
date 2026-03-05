@@ -5,68 +5,154 @@ import matplotlib.pyplot as plt
 from itertools import combinations
 from collections import Counter
 
-st.set_page_config(page_title="Análise de Loterias", layout="wide")
+st.set_page_config(page_title="Loteria Analytics Pro", layout="wide")
 
-st.title("📊 Ferramenta Estatística de Análise de Loterias")
+st.title("🎰 Loteria Analytics Pro")
 
 st.sidebar.title("Configurações")
 
-uploaded_file = st.sidebar.file_uploader(
-    "Upload arquivo oficial da Caixa (.xlsx)",
+arquivo = st.sidebar.file_uploader(
+    "Upload histórico da Caixa (.xlsx)",
     type=["xlsx"]
 )
 
-if uploaded_file:
+# -----------------------------------
+# Funções
+# -----------------------------------
 
-    df_raw = pd.read_excel(uploaded_file)
+def detectar_colunas(df):
 
-    st.success("Arquivo carregado com sucesso!")
+    cols = [c for c in df.columns if "bola" in c.lower() or "dezena" in c.lower()]
 
-    # detectar colunas de números
-    cols_numeros = [c for c in df_raw.columns if "Bola" in c or "bola" in c or "Dezena" in c]
+    if len(cols) == 0:
+        cols = df.columns[-15:]
 
-    if len(cols_numeros) == 0:
-        cols_numeros = df_raw.columns[-15:]
+    return cols
 
-    df = df_raw[cols_numeros].copy()
 
-    df = df.astype(int)
+def calcular_frequencia(df):
 
-    total_concursos = len(df)
+    freq = df.apply(pd.Series.value_counts).fillna(0).sum(axis=1)
+    return freq.sort_index()
 
-    st.sidebar.write("Concursos carregados:", total_concursos)
+
+def calcular_atraso(df, numeros):
+
+    atrasos = {}
+
+    total = len(df)
+
+    for n in numeros:
+
+        linhas = df[df.eq(n).any(axis=1)].index
+
+        if len(linhas) == 0:
+            atrasos[n] = total
+        else:
+            atrasos[n] = total - linhas.max()
+
+    return pd.Series(atrasos)
+
+
+def modelo_probabilidade(df):
+
+    freq = calcular_frequencia(df)
+
+    recencia = df.tail(50)
+
+    rec_freq = calcular_frequencia(recencia)
+
+    prob = (freq * 0.7 + rec_freq * 0.3)
+
+    prob = prob / prob.sum()
+
+    return prob
+
+
+def gerar_jogo(prob):
+
+    jogo = np.random.choice(
+        prob.index,
+        size=15,
+        replace=False,
+        p=prob.values
+    )
+
+    return sorted(jogo)
+
+
+def score_jogo(jogo, freq, atraso):
+
+    s = 0
+
+    for n in jogo:
+
+        s += freq[n] * 0.7
+        s += atraso[n] * 0.3
+
+    return s
+
+
+# -----------------------------------
+# Interface
+# -----------------------------------
+
+if arquivo:
+
+    df_raw = pd.read_excel(arquivo)
+
+    cols = detectar_colunas(df_raw)
+
+    df = df_raw[cols].astype(int)
 
     numeros = list(range(1, 26))
+
+    freq = calcular_frequencia(df)
+
+    atraso = calcular_atraso(df, numeros)
+
+    prob = modelo_probabilidade(df)
 
     menu = st.sidebar.selectbox(
         "Menu",
         [
-            "Visão geral",
-            "Frequência dos números",
-            "Números atrasados",
+            "Dashboard",
+            "Frequência",
+            "Atrasos",
+            "Heatmap",
             "Par / Ímpar",
-            "Soma dos jogos",
-            "Repetição entre concursos",
-            "Combinações mais comuns",
-            "Gerador inteligente"
+            "Soma",
+            "Repetições",
+            "Combinações",
+            "Probabilidade",
+            "Gerador Inteligente",
+            "Backtesting"
         ]
     )
 
-    if menu == "Visão geral":
+    # -----------------------------------
+    # Dashboard
+    # -----------------------------------
 
-        st.header("Resumo do histórico")
+    if menu == "Dashboard":
 
-        st.write("Total de concursos analisados:", total_concursos)
+        col1, col2, col3 = st.columns(3)
+
+        col1.metric("Concursos", len(df))
+        col2.metric("Número mais sorteado", freq.idxmax())
+        col3.metric("Número mais atrasado", atraso.idxmax())
+
+        st.subheader("Últimos concursos")
 
         st.dataframe(df.tail())
 
-    if menu == "Frequência dos números":
+    # -----------------------------------
+    # Frequência
+    # -----------------------------------
+
+    if menu == "Frequência":
 
         st.header("Frequência dos números")
-
-        freq = df.apply(pd.Series.value_counts).fillna(0).sum(axis=1)
-
-        freq = freq.sort_index()
 
         fig, ax = plt.subplots()
 
@@ -77,50 +163,59 @@ if uploaded_file:
 
         st.pyplot(fig)
 
-        st.subheader("Ranking")
+        st.dataframe(freq.sort_values(ascending=False))
 
-        ranking = freq.sort_values(ascending=False)
+    # -----------------------------------
+    # Atrasos
+    # -----------------------------------
 
-        st.dataframe(ranking)
+    if menu == "Atrasos":
 
-    if menu == "Números atrasados":
-
-        st.header("Atraso dos números")
-
-        atrasos = {}
-
-        for n in numeros:
-
-            linhas = df[df.eq(n).any(axis=1)].index
-
-            if len(linhas) == 0:
-
-                atrasos[n] = total_concursos
-
-            else:
-
-                atrasos[n] = total_concursos - linhas.max()
-
-        atrasos = pd.Series(atrasos)
+        st.header("Números atrasados")
 
         fig, ax = plt.subplots()
 
-        ax.bar(atrasos.index, atrasos.values)
-
-        ax.set_xlabel("Número")
-        ax.set_ylabel("Concursos de atraso")
+        ax.bar(atraso.index, atraso.values)
 
         st.pyplot(fig)
 
-        st.dataframe(atrasos.sort_values(ascending=False))
+        st.dataframe(atraso.sort_values(ascending=False))
+
+    # -----------------------------------
+    # Heatmap Lotofácil
+    # -----------------------------------
+
+    if menu == "Heatmap":
+
+        st.header("Heatmap da Lotofácil")
+
+        grid = np.zeros((5,5))
+
+        for n in range(1,26):
+
+            r = (n-1)//5
+            c = (n-1)%5
+
+            grid[r][c] = freq[n]
+
+        fig, ax = plt.subplots()
+
+        im = ax.imshow(grid)
+
+        for i in range(5):
+            for j in range(5):
+                num = i*5 + j + 1
+                ax.text(j, i, num, ha="center", va="center", color="white")
+
+        st.pyplot(fig)
+
+    # -----------------------------------
+    # Par / Ímpar
+    # -----------------------------------
 
     if menu == "Par / Ímpar":
 
-        st.header("Distribuição Par / Ímpar")
-
-        pares = df.apply(lambda x: sum(n % 2 == 0 for n in x), axis=1)
-
-        impares = 15 - pares
+        pares = df.apply(lambda x: sum(n%2==0 for n in x), axis=1)
 
         dist = pares.value_counts().sort_index()
 
@@ -128,21 +223,17 @@ if uploaded_file:
 
         ax.bar(dist.index, dist.values)
 
-        ax.set_xlabel("Quantidade de pares no jogo")
-        ax.set_ylabel("Ocorrências")
-
         st.pyplot(fig)
 
-        tabela = pd.DataFrame({
-            "pares": pares,
-            "ímpares": impares
-        })
+        st.write("Distribuição:")
 
-        st.dataframe(tabela)
+        st.dataframe(dist)
 
-    if menu == "Soma dos jogos":
+    # -----------------------------------
+    # Soma
+    # -----------------------------------
 
-        st.header("Distribuição da soma")
+    if menu == "Soma":
 
         soma = df.sum(axis=1)
 
@@ -150,92 +241,139 @@ if uploaded_file:
 
         ax.hist(soma, bins=20)
 
-        ax.set_xlabel("Soma dos números")
-
         st.pyplot(fig)
 
         st.write("Soma média:", soma.mean())
 
-    if menu == "Repetição entre concursos":
+    # -----------------------------------
+    # Repetições
+    # -----------------------------------
 
-        st.header("Repetição de números entre concursos")
+    if menu == "Repetições":
 
-        repeticoes = []
+        rep = []
 
-        for i in range(1, total_concursos):
+        for i in range(1, len(df)):
 
             atual = set(df.iloc[i])
-
             anterior = set(df.iloc[i-1])
 
-            repeticoes.append(len(atual & anterior))
+            rep.append(len(atual & anterior))
 
-        repeticoes = pd.Series(repeticoes)
+        rep = pd.Series(rep)
 
         fig, ax = plt.subplots()
 
-        ax.hist(repeticoes, bins=10)
-
-        ax.set_xlabel("Quantidade de números repetidos")
+        ax.hist(rep, bins=10)
 
         st.pyplot(fig)
 
-        st.write("Média de repetição:", repeticoes.mean())
+        st.write("Média:", rep.mean())
 
-    if menu == "Combinações mais comuns":
+    # -----------------------------------
+    # Combinações
+    # -----------------------------------
 
-        st.header("Pares mais frequentes")
+    if menu == "Combinações":
 
         pares = Counter()
 
         for row in df.values:
 
-            for c in combinations(row, 2):
+            for c in combinations(row,2):
 
-                pares[c] += 1
+                pares[c]+=1
 
-        mais_comuns = pares.most_common(20)
-
-        tabela = pd.DataFrame(mais_comuns, columns=["Par", "Frequência"])
+        tabela = pd.DataFrame(
+            pares.most_common(20),
+            columns=["Par","Frequência"]
+        )
 
         st.dataframe(tabela)
 
-    if menu == "Gerador inteligente":
+    # -----------------------------------
+    # Probabilidade
+    # -----------------------------------
 
-        st.header("Gerador inteligente de jogos")
+    if menu == "Probabilidade":
 
-        qtd = st.number_input(
-            "Quantidade de jogos",
-            min_value=1,
-            max_value=50,
-            value=5
-        )
+        st.header("Probabilidade estimada")
 
-        freq = df.apply(pd.Series.value_counts).fillna(0).sum(axis=1)
+        tabela = pd.DataFrame({
+            "Número": prob.index,
+            "Probabilidade": prob.values
+        })
 
-        prob = freq / freq.sum()
+        st.dataframe(tabela.sort_values("Probabilidade",ascending=False))
+
+        fig, ax = plt.subplots()
+
+        ax.bar(prob.index, prob.values)
+
+        st.pyplot(fig)
+
+    # -----------------------------------
+    # Gerador inteligente
+    # -----------------------------------
+
+    if menu == "Gerador Inteligente":
+
+        st.header("Gerador otimizado")
+
+        qtd = st.number_input("Jogos",1,100,5)
 
         jogos = []
 
-        for i in range(qtd):
+        for i in range(qtd*10):
 
-            jogo = np.random.choice(
-                prob.index,
-                size=15,
-                replace=False,
-                p=prob.values
-            )
+            jogo = gerar_jogo(prob)
 
-            jogo = sorted(jogo)
+            s = score_jogo(jogo,freq,atraso)
 
-            jogos.append(jogo)
+            jogos.append((jogo,s))
 
-        st.subheader("Jogos gerados")
+        jogos = sorted(jogos,key=lambda x:x[1],reverse=True)
 
-        for j in jogos:
+        st.subheader("Melhores jogos")
+
+        for j,s in jogos[:qtd]:
 
             st.success(" | ".join(f"{n:02d}" for n in j))
 
+    # -----------------------------------
+    # Backtesting
+    # -----------------------------------
+
+    if menu == "Backtesting":
+
+        st.header("Simulação histórica")
+
+        acertos = []
+
+        for i in range(100,len(df)):
+
+            treino = df.iloc[:i]
+
+            prob = modelo_probabilidade(treino)
+
+            jogo = gerar_jogo(prob)
+
+            real = set(df.iloc[i])
+
+            acerto = len(set(jogo) & real)
+
+            acertos.append(acerto)
+
+        acertos = pd.Series(acertos)
+
+        fig, ax = plt.subplots()
+
+        ax.hist(acertos,bins=10)
+
+        st.pyplot(fig)
+
+        st.write("Média de acertos:", acertos.mean())
+
 else:
 
-    st.info("Faça upload do arquivo histórico da Caixa para iniciar.")
+    st.info("Faça upload do arquivo histórico da Caixa.")
