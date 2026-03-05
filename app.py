@@ -59,46 +59,43 @@ pares = df.apply(lambda x: sum(n % 2 == 0 for n in x), axis=1)
 
 stat, p = chisquare(freq, [freq.sum() / total_numeros] * total_numeros)
 
-    col1, col2, col3 = st.columns(3)
+col1, col2, col3 = st.columns(3)
 
-    col1.metric("Média da Soma", round(soma.mean(), 2))
-    col2.metric("Média de Pares", round(pares.mean(), 2))
-    col3.metric("p-value Qui²", round(p, 4))
+col1.metric("Média da Soma", round(soma.mean(), 2))
+col2.metric("Média de Pares", round(pares.mean(), 2))
+col3.metric("p-value Qui²", round(p, 4))
 
-    # ==============================
-    # Frequência
-    # ==============================
+# ==============================
+# Frequência
+# ==============================
 
-    st.subheader("Frequência Real dos Números")
+st.subheader("Frequência Real dos Números")
 
-    fig, ax = plt.subplots()
-    ax.bar(freq.index, freq.values)
-    st.pyplot(fig)
+fig, ax = plt.subplots()
+ax.bar(freq.index, freq.values)
+st.pyplot(fig)
 
-    # ==============================
-    # Ranking
-    # ==============================
+# ==============================
+# Ranking
+# ==============================
 
-    st.subheader("🔥 Top 10 Mais Frequentes")
-    st.write(freq.sort_values(ascending=False).head(10))
+st.subheader("🔥 Top 10 Mais Frequentes")
+st.write(freq.sort_values(ascending=False).head(10))
 
-    # ==============================
-    # Gerador Baseado em Frequência
-    # ==============================
+# ==============================
+# Gerador Baseado em Frequência
+# ==============================
 
-    st.subheader("🎯 Gerar Jogo Baseado na Frequência")
+st.subheader("🎯 Gerar Jogo Baseado na Frequência")
 
-    if st.button("Gerar Jogo Inteligente"):
-        probabilidades = freq / freq.sum()
-        jogo = np.random.choice(
-            freq.index,
-            size=dezenas,
-            replace=False,
-            p=probabilidades
-        )
+if st.button("Gerar Jogo Inteligente"):
+    probabilidades = freq / freq.sum()
+    jogo = np.random.choice(
+        freq.index,
+        size=dezenas,
+        replace=False,
+        p=probabilidades
+    )
 
-        jogo = sorted([int(n) for n in jogo])
+    jogo = sorted([int(n) for n in jogo])
         st.success(" | ".join(f"{n:02d}" for n in jogo))
-
-
-
