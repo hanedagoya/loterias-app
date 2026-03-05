@@ -44,10 +44,6 @@ if arquivo is not None:
 
     st.success("Arquivo carregado com sucesso!")
 
-    # ==============================
-    # Estatísticas
-    # ==============================
-
 # ==============================
 # Estatísticas
 # ==============================
@@ -103,5 +99,6 @@ stat, p = chisquare(freq, [freq.sum() / total_numeros] * total_numeros)
 
         jogo = sorted([int(n) for n in jogo])
         st.success(" | ".join(f"{n:02d}" for n in jogo))
+
 
 
