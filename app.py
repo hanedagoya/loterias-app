@@ -7,24 +7,29 @@ from collections import Counter
 from scipy.stats import entropy
 from sklearn.ensemble import RandomForestClassifier
 
-st.set_page_config(page_title="Laboratório Científico de Loterias", layout="wide")
+st.set_page_config(
+page_title="Laboratório Científico de Loterias",
+layout="wide"
+)
 
-st.title("🧠 Laboratório Científico de Análise de Loterias")
+st.title("🧠 Laboratório Científico de Loterias")
 
-st.markdown("""
-Ferramenta experimental para estudo estatístico de loterias.
+st.markdown(
+"""
+Ferramenta experimental para análise estatística de loterias.
 
 Inclui:
 
-* Frequência histórica
-* Entropia de Shannon
-* Atraso de dezenas
-* Matriz de co-ocorrência
-* Probabilidade com Machine Learning
-* Simulação Monte Carlo
-* Gerador evolutivo de jogos
-* Backtesting histórico
-  """)
+• Frequência histórica
+• Entropia de Shannon
+• Atraso das dezenas
+• Co-ocorrência entre números
+• Machine Learning
+• Simulação Monte Carlo
+• Algoritmo evolutivo
+• Backtesting
+"""
+)
 
 uploaded_file = st.file_uploader(
 "Envie o arquivo oficial da Caixa (.xlsx)",
@@ -35,17 +40,23 @@ if uploaded_file is None:
 st.warning("Envie o arquivo para iniciar a análise.")
 st.stop()
 
+# ---------------------------------------------------
+
+# Leitura do Excel
+
+# ---------------------------------------------------
+
 try:
 df_raw = pd.read_excel(uploaded_file)
-except:
+except Exception:
 st.error("Erro ao ler o arquivo Excel.")
 st.stop()
 
-# ------------------------------
+# ---------------------------------------------------
 
-# Detectar colunas de números
+# Detectar colunas de dezenas
 
-# ------------------------------
+# ---------------------------------------------------
 
 cols = [
 c for c in df_raw.columns
@@ -53,17 +64,26 @@ if "bola" in c.lower() or "dezena" in c.lower()
 ]
 
 if len(cols) == 0:
-st.error("Não foi possível detectar colunas de números.")
+st.error("Não foi possível detectar as colunas de dezenas.")
 st.stop()
 
 df = df_raw[cols].copy()
 
 df = df.apply(pd.to_numeric, errors="coerce")
+
 df = df.dropna()
+
+if len(df) == 0:
+st.error("Dataset vazio após limpeza.")
+st.stop()
 
 numeros = df.values.flatten().astype(int)
 
-max_num = int(np.max(numeros))
+# ---------------------------------------------------
+
+# Configuração do jogo
+
+# ---------------------------------------------------
 
 st.sidebar.header("Configuração")
 
@@ -81,11 +101,11 @@ jogo_n = 15
 
 nums = list(range(1, total + 1))
 
-# ------------------------------
+# ---------------------------------------------------
 
-# Frequência histórica
+# Frequência
 
-# ------------------------------
+# ---------------------------------------------------
 
 st.header("📊 Frequência Histórica")
 
@@ -100,11 +120,11 @@ fig = px.bar(freq_df, x="numero", y="freq")
 
 st.plotly_chart(fig, use_container_width=True)
 
-# ------------------------------
+# ---------------------------------------------------
 
 # Entropia
 
-# ------------------------------
+# ---------------------------------------------------
 
 st.header("🧮 Entropia do Sistema")
 
@@ -114,11 +134,11 @@ ent = entropy(prob)
 
 st.metric("Entropia de Shannon", round(ent, 4))
 
-# ------------------------------
+# ---------------------------------------------------
 
-# Atraso
+# Atraso das dezenas
 
-# ------------------------------
+# ---------------------------------------------------
 
 st.header("⏳ Atraso das Dezenas")
 
@@ -147,11 +167,11 @@ fig = px.bar(delay_df, x="numero", y="atraso")
 
 st.plotly_chart(fig, use_container_width=True)
 
-# ------------------------------
+# ---------------------------------------------------
 
 # Co-ocorrência
 
-# ------------------------------
+# ---------------------------------------------------
 
 st.header("🔥 Co-ocorrência entre Números")
 
@@ -171,13 +191,13 @@ fig = px.imshow(matrix)
 
 st.plotly_chart(fig, use_container_width=True)
 
-# ------------------------------
+# ---------------------------------------------------
 
 # Machine Learning
 
-# ------------------------------
+# ---------------------------------------------------
 
-st.header("🤖 Estimativa de Probabilidade (Random Forest)")
+st.header("🤖 Estimativa de Probabilidade")
 
 X = []
 y = []
@@ -198,7 +218,7 @@ X = np.array(X)
 y = np.array(y)
 
 model = RandomForestClassifier(
-n_estimators=200,
+n_estimators=150,
 random_state=42
 )
 
@@ -223,19 +243,19 @@ fig = px.bar(prob_df, x="numero", y="prob")
 
 st.plotly_chart(fig, use_container_width=True)
 
-# ------------------------------
+# ---------------------------------------------------
 
 # Monte Carlo
 
-# ------------------------------
+# ---------------------------------------------------
 
 st.header("🎲 Simulação Monte Carlo")
 
 sim = st.slider(
 "Número de simulações",
 1000,
-50000,
-10000
+30000,
+8000
 )
 
 result = []
@@ -252,20 +272,20 @@ result.append((jogo, score))
 
 result.sort(key=lambda x: x[1], reverse=True)
 
-top = result[:20]
+top = result[:15]
 
 st.subheader("Top jogos simulados")
 
 for j, s in top:
 st.write(sorted(j))
 
-# ------------------------------
+# ---------------------------------------------------
 
 # Algoritmo Genético
 
-# ------------------------------
+# ---------------------------------------------------
 
-st.header("🧬 Gerador Evolutivo de Jogos")
+st.header("🧬 Gerador Evolutivo")
 
 def fitness(jogo):
 
@@ -331,11 +351,11 @@ st.success(
 )
 ```
 
-# ------------------------------
+# ---------------------------------------------------
 
 # Backtesting
 
-# ------------------------------
+# ---------------------------------------------------
 
 st.header("🧪 Backtesting")
 
@@ -371,8 +391,5 @@ st.plotly_chart(fig, use_container_width=True)
 st.markdown("---")
 
 st.caption(
-"""
-⚠️ Aviso científico: Loterias ideais são processos aleatórios independentes.
-Este aplicativo serve apenas para análise estatística exploratória.
-"""
+"⚠️ Loterias são processos aleatórios independentes. Esta ferramenta é apenas para estudo estatístico."
 )
