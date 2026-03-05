@@ -4,16 +4,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import chisquare
 
-st.set_page_config(page_title="Análise Oficial Loterias", layout="wide")
+st.set_page_config(page_title="Análise Loterias", layout="wide")
 
-st.title("📊 Análise Oficial - Mega-Sena & Lotofácil")
+st.title("📊 Análise Estatística - Mega-Sena & Lotofácil")
 
-# ==============================
-# Escolha da Loteria
-# ==============================
+# ------------------------------
+# Escolha da loteria
+# ------------------------------
 
 loteria = st.sidebar.selectbox(
-    "Escolha a Loteria",
+    "Escolha a loteria",
     ["Mega-Sena", "Lotofácil"]
 )
 
@@ -24,78 +24,88 @@ else:
     total_numeros = 25
     dezenas = 15
 
-# ==============================
-# Upload do Arquivo Oficial
-# ==============================
+# ------------------------------
+# Upload do arquivo
+# ------------------------------
 
-st.subheader("📂 Upload do arquivo oficial (.xlsx) da Caixa")
+st.subheader("📂 Upload do arquivo oficial (.xlsx)")
 
-arquivo = st.file_uploader("Envie o arquivo .xlsx", type=["xlsx"])
+arquivo = st.file_uploader(
+    "Envie o arquivo baixado do site da Caixa",
+    type=["xlsx"]
+)
 
 if arquivo is not None:
 
     df_raw = pd.read_excel(arquivo)
 
-    # Detectar automaticamente colunas de dezenas
-    colunas_numericas = df_raw.select_dtypes(include=np.number).columns
+    # pegar apenas colunas numéricas
+    colunas_numericas = df_raw.select_dtypes(include=np.number)
 
-    # Pegar últimas colunas numéricas (onde ficam as dezenas)
-    df = df_raw[colunas_numericas].iloc[:, -dezenas:]
+    # pegar últimas colunas (onde ficam as dezenas)
+    df = colunas_numericas.iloc[:, -dezenas:]
 
     st.success("Arquivo carregado com sucesso!")
 
-# ==============================
-# Estatísticas
-# ==============================
+    # ------------------------------
+    # Estatísticas
+    # ------------------------------
 
-valores = df.values.flatten()
+    valores = df.values.flatten()
 
-freq = pd.Series(valores).value_counts().sort_index()
-freq = freq.reindex(range(1, total_numeros + 1), fill_value=0)
+    freq = pd.Series(valores).value_counts().sort_index()
+    freq = freq.reindex(range(1, total_numeros + 1), fill_value=0)
 
-soma = df.sum(axis=1)
+    soma = df.sum(axis=1)
 
-pares = df.apply(lambda x: sum(n % 2 == 0 for n in x), axis=1)
+    pares = df.apply(lambda x: sum(n % 2 == 0 for n in x), axis=1)
 
-stat, p = chisquare(freq, [freq.sum() / total_numeros] * total_numeros)
+    stat, p = chisquare(freq, [freq.sum() / total_numeros] * total_numeros)
 
-col1, col2, col3 = st.columns(3)
+    col1, col2, col3 = st.columns(3)
 
-col1.metric("Média da Soma", round(soma.mean(), 2))
-col2.metric("Média de Pares", round(pares.mean(), 2))
-col3.metric("p-value Qui²", round(p, 4))
+    col1.metric("Média da soma", round(soma.mean(), 2))
+    col2.metric("Média de pares", round(pares.mean(), 2))
+    col3.metric("p-value Qui²", round(p, 4))
 
-# ==============================
-# Frequência
-# ==============================
+    # ------------------------------
+    # Gráfico frequência
+    # ------------------------------
 
-st.subheader("Frequência Real dos Números")
+    st.subheader("Frequência dos números")
 
-fig, ax = plt.subplots()
-ax.bar(freq.index, freq.values)
-st.pyplot(fig)
+    fig, ax = plt.subplots()
+    ax.bar(freq.index, freq.values)
 
-# ==============================
-# Ranking
-# ==============================
+    st.pyplot(fig)
 
-st.subheader("🔥 Top 10 Mais Frequentes")
-st.write(freq.sort_values(ascending=False).head(10))
+    # ------------------------------
+    # Top números
+    # ------------------------------
 
-# ==============================
-# Gerador Baseado em Frequência
-# ==============================
+    st.subheader("🔥 Top 10 mais frequentes")
 
-st.subheader("🎯 Gerar Jogo Baseado na Frequência")
+    st.write(freq.sort_values(ascending=False).head(10))
 
-if st.button("Gerar Jogo Inteligente"):
-    probabilidades = freq / freq.sum()
-    jogo = np.random.choice(
-        freq.index,
-        size=dezenas,
-        replace=False,
-        p=probabilidades
-    )
+    # ------------------------------
+    # Gerador de jogo
+    # ------------------------------
 
-    jogo = sorted([int(n) for n in jogo])
-        st.success(" | ".join(f"{n:02d}" for n in jogo))
+    st.subheader("🎲 Gerar jogo baseado na frequência")
+
+    if st.button("Gerar jogo"):
+
+        probabilidades = freq / freq.sum()
+
+        jogo = np.random.choice(
+            freq.index,
+            size=dezenas,
+            replace=False,
+            p=probabilidades
+        )
+
+        jogo = sorted([int(n) for n in jogo])
+
+        jogo_formatado = " | ".join(f"{n:02d}" for n in jogo)
+
+        st.success(jogo_formatado)
